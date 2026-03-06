@@ -12,21 +12,26 @@ background:black;
 color:white;
 font-family:serif;
 text-align:center;
+touch-action:none;
+margin:0;
 }
 
 h1{
-margin-top:30px;
+margin-top:20px;
 font-size:40px;
 }
 
 #board{
-width:900px;
-height:500px;
+width:90vw;
+height:60vh;
+max-width:900px;
+max-height:500px;
 margin:auto;
 margin-top:40px;
 position:relative;
 border:6px double #aaa;
 border-radius:20px;
+
 box-shadow:
 0 0 40px rgba(255,255,255,0.2) inset,
 0 0 20px rgba(255,255,255,0.2);
@@ -46,6 +51,7 @@ border-radius:16px;
 .letter{
 position:absolute;
 font-size:26px;
+user-select:none;
 }
 
 .special{
@@ -58,8 +64,36 @@ height:60px;
 border:3px solid white;
 border-radius:50%;
 position:absolute;
-box-shadow:0 0 15px white;
+
+box-shadow:
+0 0 20px white,
+0 0 30px rgba(255,255,255,0.5);
+
 pointer-events:none;
+}
+
+.controls{
+margin-top:30px;
+}
+
+input{
+padding:10px;
+width:300px;
+}
+
+button{
+padding:10px 20px;
+margin-left:10px;
+cursor:pointer;
+}
+
+#resetBtn{
+position:fixed;
+right:25px;
+bottom:25px;
+background:#111;
+color:white;
+border:1px solid white;
 }
 
 </style>
@@ -74,6 +108,14 @@ pointer-events:none;
 <div id="planchette"></div>
 </div>
 
+<div class="controls">
+<input id="question" placeholder="Ask a question">
+<button onclick="askText()">Ask</button>
+<button onclick="toggleMic()">🎤 Mic</button>
+</div>
+
+<button id="resetBtn" onclick="resetGhost()">Reset</button>
+
 <script>
 
 const board=document.getElementById("board")
@@ -86,6 +128,9 @@ let startY=420
 
 let targetX=startX
 let targetY=startY
+
+let busy=false
+let systemLock=false
 
 const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -132,7 +177,16 @@ createBoard()
 planchette.style.left=startX+"px"
 planchette.style.top=startY+"px"
 
+
+
+/* FOLLOW SYSTEM */
+
 function follow(){
+
+if(systemLock){
+requestAnimationFrame(follow)
+return
+}
 
 let px=planchette.offsetLeft
 let py=planchette.offsetTop
@@ -152,6 +206,10 @@ requestAnimationFrame(follow)
 
 follow()
 
+
+
+/* REPLAY SYSTEM */
+
 let path=[]
 let replaying=false
 let idleTimer=null
@@ -160,14 +218,7 @@ const stopDelay=700
 const replayDelay=800
 const stepDelay=12
 
-board.addEventListener("mousemove",function(e){
-
-if(replaying) return
-
-let rect=board.getBoundingClientRect()
-
-let x=e.clientX-rect.left
-let y=e.clientY-rect.top
+function updateTarget(x,y){
 
 targetX=x
 targetY=y
@@ -178,9 +229,39 @@ clearTimeout(idleTimer)
 
 idleTimer=setTimeout(startReplay,stopDelay)
 
+}
+
+board.addEventListener("mousemove",function(e){
+
+if(replaying || systemLock) return
+
+let rect=board.getBoundingClientRect()
+
+let x=e.clientX-rect.left
+let y=e.clientY-rect.top
+
+updateTarget(x,y)
+
+})
+
+board.addEventListener("touchmove",function(e){
+
+if(replaying || systemLock) return
+
+let rect=board.getBoundingClientRect()
+
+let touch=e.touches[0]
+
+let x=touch.clientX-rect.left
+let y=touch.clientY-rect.top
+
+updateTarget(x,y)
+
 })
 
 function startReplay(){
+
+if(systemLock) return
 
 if(path.length<5) return
 
@@ -189,6 +270,12 @@ replaying=true
 let i=0
 
 function step(){
+
+if(systemLock){
+replaying=false
+path=[]
+return
+}
 
 if(i>=path.length){
 
@@ -211,6 +298,294 @@ setTimeout(step,stepDelay)
 
 setTimeout(step,replayDelay)
 
+}
+
+
+
+/*  GHOST SYSTEM */
+
+let ghost={}
+
+function random(arr){
+return arr[Math.floor(Math.random()*arr.length)]
+}
+
+function createGhost(){
+
+ghost.name=random([
+"ANNA","DAVID","EMMA","LUCAS","SARAH",
+"JOHN","MARY","ELLA","JAMES","HENRY",
+"CHARLES","ALICE","THOMAS","SAM","OLIVER",
+"MICHAEL","ELIZA","VICTOR","EDWARD","JULIA"
+])
+
+ghost.age=Math.floor(Math.random()*90)+5
+
+ghost.place=random([
+"HERE","BEHIND","CLOSE",
+"ATTIC","BASEMENT","UPSTAIRS",
+"DOWNSTAIRS","DOOR","HALL",
+"CLOSET","WINDOW","CORNER"
+])
+
+ghost.room=random([
+"KITCHEN","BEDROOM","BATHROOM",
+"HALLWAY","GARAGE","BASEMENT",
+"ATTIC","LIVINGROOM"
+])
+
+ghost.death=random([
+"FALL","FIRE","DROWN","ACCIDENT",
+"SICK","KILLED","COLD","HUNGER"
+])
+
+}
+
+createGhost()
+
+function resetGhost(){
+createGhost()
+}
+
+
+
+/* ASK  */
+
+async function askText(){
+
+if(busy || systemLock) return
+
+systemLock=true
+
+replaying=false
+path=[]
+
+await move(startX,startY)
+
+let q=document.getElementById("question").value.toLowerCase()
+
+let answer=decideAnswer(q)
+
+await spell(answer)
+
+await move(startX,startY)
+
+await sleep(400)
+
+systemLock=false
+
+}
+
+
+
+/* MIC */
+
+let recognition
+let listening=false
+
+function initMic(){
+
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition
+
+if(!SpeechRecognition){
+alert("Speech recognition not supported")
+return
+}
+
+recognition=new SpeechRecognition()
+
+recognition.lang="en-US"
+recognition.continuous=true
+recognition.interimResults=false
+
+recognition.onstart=function(){
+listening=true
+document.body.style.boxShadow="0 0 50px red inset"
+}
+
+recognition.onend=function(){
+listening=false
+document.body.style.boxShadow=""
+if(!busy && !systemLock){
+setTimeout(()=>recognition.start(),300)
+}
+}
+
+recognition.onresult=function(event){
+
+let text=""
+
+for(let i=event.resultIndex;i<event.results.length;i++){
+text+=event.results[i][0].transcript
+}
+
+document.getElementById("question").value=text
+
+if(event.results[event.results.length-1].isFinal){
+
+if(!busy && !systemLock){
+recognition.stop()
+askText()
+}
+
+}
+
+}
+
+}
+
+initMic()
+
+function toggleMic(){
+
+if(systemLock) return
+
+if(!listening){
+recognition.start()
+}else{
+recognition.stop()
+}
+
+}
+
+
+
+/* QA SYS */
+
+function decideAnswer(q){
+
+q=q.toLowerCase().replace(/[^\w\s]/g,"")
+
+if(q.includes("hello")||q.includes("hi")||q.includes("are you there"))
+return "HELLO"
+
+if(q.includes("can you hear me")||q.includes("hear me"))
+return "YES"
+
+if(q.includes("are you here"))
+return "YES"
+
+if(q.includes("should i leave")||q.includes("should we leave"))
+return Math.random()>0.5?"YES":"NO"
+
+if(q.includes("are you friendly"))
+return Math.random()>0.5?"YES":"NO"
+
+if(q.includes("do you want us here"))
+return Math.random()>0.5?"YES":"NO"
+
+if(q.includes("are you angry"))
+return Math.random()>0.5?"YES":"NO"
+
+if(
+q.includes("how old") ||
+q.includes("your age") ||
+q==="age"
+){
+return ghost.age.toString()
+}
+
+if(
+q.includes("what is your name") ||
+q.includes("who are you")
+)
+return ghost.name
+
+if(q.includes("where are you"))
+return ghost.place
+
+if(q.includes("which room"))
+return ghost.room
+
+if(q.includes("how did you die"))
+return ghost.death
+
+let randomAnswers=[
+"RUN","LEAVE","HIDE","STAY",
+"NO","YES","DANGER","HELP",
+"SOON","WATCH"
+]
+
+return random(randomAnswers)
+
+}
+
+
+
+/* SPELL SYSTEM */
+
+async function spell(word){
+
+busy=true
+
+await sleep(1200)
+
+for(let i=0;i<word.length;i++){
+
+let letter=word[i]
+let target=nodes[letter]
+
+if(!target) continue
+
+await move(target.x,target.y)
+await sleep(350)
+
+}
+
+await move(startX,startY)
+
+busy=false
+
+}
+
+
+
+function move(targetX,targetY){
+
+return new Promise(resolve=>{
+
+let speed=4.5
+
+function step(){
+
+let px=planchette.offsetLeft
+let py=planchette.offsetTop
+
+let cx=px+planchette.offsetWidth/2
+let cy=py+planchette.offsetHeight/2
+
+let dx=targetX-cx
+let dy=targetY-cy
+
+let dist=Math.sqrt(dx*dx+dy*dy)
+
+if(dist<speed){
+
+planchette.style.left=(targetX-planchette.offsetWidth/2)+"px"
+planchette.style.top=(targetY-planchette.offsetHeight/2)+"px"
+
+resolve()
+return
+}
+
+let vx=dx/dist*speed
+let vy=dy/dist*speed
+
+planchette.style.left=px+vx+"px"
+planchette.style.top=py+vy+"px"
+
+requestAnimationFrame(step)
+
+}
+
+step()
+
+})
+
+}
+
+function sleep(ms){
+return new Promise(r=>setTimeout(r,ms))
 }
 
 </script>
