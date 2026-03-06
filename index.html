@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<title>Ouija Board</title>
+
+<style>
+
+body{
+background:black;
+color:white;
+font-family:serif;
+text-align:center;
+}
+
+h1{
+margin-top:30px;
+font-size:40px;
+}
+
+#board{
+width:900px;
+height:500px;
+margin:auto;
+margin-top:40px;
+position:relative;
+border:6px double #aaa;
+border-radius:20px;
+box-shadow:
+0 0 40px rgba(255,255,255,0.2) inset,
+0 0 20px rgba(255,255,255,0.2);
+}
+
+#board::before{
+content:"";
+position:absolute;
+top:12px;
+left:12px;
+right:12px;
+bottom:12px;
+border:1px solid rgba(255,255,255,0.3);
+border-radius:16px;
+}
+
+.letter{
+position:absolute;
+font-size:26px;
+}
+
+.special{
+font-size:24px;
+}
+
+#planchette{
+width:60px;
+height:60px;
+border:3px solid white;
+border-radius:50%;
+position:absolute;
+box-shadow:0 0 15px white;
+pointer-events:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Ouija Board</h1>
+
+<div id="board">
+<div id="planchette"></div>
+</div>
+
+<script>
+
+const board=document.getElementById("board")
+const planchette=document.getElementById("planchette")
+
+let nodes={}
+
+let startX=420
+let startY=420
+
+let targetX=startX
+let targetY=startY
+
+const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+function add(char,x,y,cls=""){
+
+let d=document.createElement("div")
+
+d.className="letter "+cls
+d.innerText=char
+
+d.style.left=x+"px"
+d.style.top=y+"px"
+
+board.appendChild(d)
+
+nodes[char]={x:x+10,y:y+18}
+
+}
+
+function createBoard(){
+
+let space=60
+
+add("YES",80,30,"special")
+add("NO",720,30,"special")
+
+for(let i=0;i<13;i++)
+add(alphabet[i],40+i*space,140)
+
+for(let i=13;i<26;i++)
+add(alphabet[i],40+(i-13)*space,210)
+
+let numbers="0123456789"
+
+for(let i=0;i<10;i++)
+add(numbers[i],150+i*60,290)
+
+add("GOODBYE",380,360,"special")
+
+}
+
+createBoard()
+
+planchette.style.left=startX+"px"
+planchette.style.top=startY+"px"
+
+function follow(){
+
+let px=planchette.offsetLeft
+let py=planchette.offsetTop
+
+let cx=px+planchette.offsetWidth/2
+let cy=py+planchette.offsetHeight/2
+
+let dx=targetX-cx
+let dy=targetY-cy
+
+planchette.style.left=px+dx*0.15+"px"
+planchette.style.top=py+dy*0.15+"px"
+
+requestAnimationFrame(follow)
+
+}
+
+follow()
+
+let path=[]
+let replaying=false
+let idleTimer=null
+
+const stopDelay=700
+const replayDelay=800
+const stepDelay=12
+
+board.addEventListener("mousemove",function(e){
+
+if(replaying) return
+
+let rect=board.getBoundingClientRect()
+
+let x=e.clientX-rect.left
+let y=e.clientY-rect.top
+
+targetX=x
+targetY=y
+
+path.push({x,y})
+
+clearTimeout(idleTimer)
+
+idleTimer=setTimeout(startReplay,stopDelay)
+
+})
+
+function startReplay(){
+
+if(path.length<5) return
+
+replaying=true
+
+let i=0
+
+function step(){
+
+if(i>=path.length){
+
+replaying=false
+path=[]
+return
+
+}
+
+let p=path[i]
+
+targetX=p.x
+targetY=p.y
+
+i++
+
+setTimeout(step,stepDelay)
+
+}
+
+setTimeout(step,replayDelay)
+
+}
+
+</script>
+
+</body>
+</html>
