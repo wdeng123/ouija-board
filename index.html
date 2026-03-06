@@ -72,19 +72,43 @@ box-shadow:
 pointer-events:none;
 }
 
+
+
 .controls{
 margin-top:30px;
+display:flex;
+justify-content:center; /* X */
+align-items:center;
 }
 
-input{
-padding:10px;
-width:300px;
+
+
+
+#question{
+display:none;
 }
 
-button{
+
+
+button[onclick="askText()"]{
+display:none;
+}
+
+
+
+
+button[onclick="toggleMic()"]{
+
 padding:10px 20px;
-margin-left:10px;
 cursor:pointer;
+
+background:black;
+color:white;
+border:1px solid white;
+border-radius:20px;
+
+font-size:18px;
+
 }
 
 #resetBtn{
@@ -302,7 +326,7 @@ setTimeout(step,replayDelay)
 
 
 
-/*  GHOST SYSTEM */
+/* GHOST SYSTEM */
 
 let ghost={}
 
@@ -349,7 +373,7 @@ createGhost()
 
 
 
-/* ASK  */
+/* ASK */
 
 async function askText(){
 
@@ -450,20 +474,56 @@ recognition.stop()
 
 
 
-/* QA SYS */
+/* QA */
 
 function decideAnswer(q){
 
 q=q.toLowerCase().replace(/[^\w\s]/g,"")
 
+/* greetings */
+
 if(q.includes("hello")||q.includes("hi")||q.includes("are you there"))
-return "HELLO"
+return "HI"
+
+
+/* hearing */
 
 if(q.includes("can you hear me")||q.includes("hear me"))
 return "YES"
 
+
+/* presence */
+
 if(q.includes("are you here"))
 return "YES"
+
+
+/* following q */
+
+if(
+q.includes("could you stop follow me") ||
+q.includes("stop follow me") ||
+q.includes("stop following me") ||
+q.includes("stop moving") ||
+q.includes("leave me alone")
+)
+return "NO"
+
+if(
+q.includes("are you following me") ||
+q.includes("why are you following me") ||
+q.includes("are you watching me")
+)
+return "YES"
+
+if(
+q.includes("what do you want") ||
+q.includes("why are you here")
+)
+return random(["YOU","STAY","PLAY","WATCH"])
+
+
+/* yes/no random */
 
 if(q.includes("should i leave")||q.includes("should we leave"))
 return Math.random()>0.5?"YES":"NO"
@@ -476,6 +536,9 @@ return Math.random()>0.5?"YES":"NO"
 
 if(q.includes("are you angry"))
 return Math.random()>0.5?"YES":"NO"
+
+
+/* ghost info */
 
 if(
 q.includes("how old") ||
@@ -500,6 +563,9 @@ return ghost.room
 if(q.includes("how did you die"))
 return ghost.death
 
+
+/* fallback random */
+
 let randomAnswers=[
 "RUN","LEAVE","HIDE","STAY",
 "NO","YES","DANGER","HELP",
@@ -512,7 +578,7 @@ return random(randomAnswers)
 
 
 
-/* SPELL SYSTEM */
+/* SPELL */
 
 async function spell(word){
 
